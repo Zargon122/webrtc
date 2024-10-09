@@ -1,15 +1,23 @@
+const fs = require('fs');
+const https = require('https');
 const WebSocket = require('ws');
 const express = require('express');
-const http = require('http');
 const sqlite3 = require('sqlite3').verbose();
 
 // Инициализация приложения Express
 const app = express();
-const server = http.createServer(app);
+
+// SSL сертификаты (здесь укажите правильные пути к вашим сертификатам)
+const server = https.createServer({
+    cert: fs.readFileSync('/path/to/fullchain.pem'), // Путь к сертификату
+    key: fs.readFileSync('/path/to/privkey.pem')     // Путь к приватному ключу
+});
+
+// Инициализация WSS поверх HTTPS
 const wss = new WebSocket.Server({ server });
 
 // Инициализация базы данных SQLite
-const db = new sqlite3.Database(':memory:'); // Вы можете использовать файл для постоянного хранения
+const db = new sqlite3.Database(':memory:'); // Можно использовать файл для постоянного хранения данных
 
 // Создание таблицы комнат и сообщений в базе данных
 db.serialize(() => {
@@ -182,7 +190,7 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Запуск сервера на порту 8000
+// Запуск HTTPS сервера и WSS WebSocket
 server.listen(8000, () => {
-    console.log('Server is running on port 8000');
+    console.log('Server is running with WSS on port 8000');
 });
