@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Voice Rooms</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #36393f;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            color: white;
+        }
+
+        .sidebar {
+            width: 20%;
+            background-color: #2f3136;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar h2 {
+            color: #b9bbbe;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .sidebar input, .sidebar button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #40444b;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .sidebar button {
+            background-color: #5865f2;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .sidebar button:hover {
+            background-color: #4752c4;
+        }
+
+        .room-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .room-list .room {
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #40444b;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .room-list .room:hover {
+            background-color: #4752c4;
+        }
+
+        .main-content {
+            width: 80%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            justify-content: center;
+            align-items: center;
+            background-color: #36393f;
+        }
+
+        .main-content h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #5865f2;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .controls button:hover {
+            background-color: #4752c4;
+        }
+
+        .stream-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .stream-section video {
+            width: 80%;
+            max-width: 800px;
+            border-radius: 10px;
+            background-color: #202225;
+        }
+
+        .status {
+            margin-bottom: 20px;
+            color: #b9bbbe;
+        }
+
+        .chat {
+            display: flex;
+            flex-direction: column;
+            width: 80%;
+            background-color: #40444b;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .chat .messages {
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #2f3136;
+            border-radius: 10px;
+        }
+
+        .chat input {
+            padding: 10px;
+            margin-right: 10px;
+            width: 100%;
+            background-color: #202225;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        .chat button {
+            padding: 10px;
+            background-color: #5865f2;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .chat button:hover {
+            background-color: #4752c4;
+        }
+
+        .user-list {
+            background-color: #2f3136;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 10px;
+            width: 80%;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .user-list h3 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            color: #b9bbbe;
+            width: 100%;
+        }
+
+        .user {
+            padding: 10px;
+            margin: 5px;
+            background-color: #40444b;
+            border-radius: 5px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100px;
+            text-align: center;
+        }
+
+        .user.active {
+            background-color: #5865f2;
+        }
+
+        .user.inactive {
+            background-color: #40444b;
+        }
+    </style>
+</head>
+<body>
+<!-- Левое меню для выбора комнаты -->
+<div class="sidebar">
+    <h2>Voice Rooms</h2>
+    <input type="text" id="nicknameInput" placeholder="Enter your nickname" />
+    <button id="setNicknameButton">Set Nickname</button>
+    <input type="text" id="newRoomInput" placeholder="Enter new room name" />
+    <button id="createRoomButton">Create Room</button>
+    <div class="room-list">
+    </div>
+</div>
+
+<!-- Основное содержимое -->
+<div class="main-content">
+    <h1>Voice Chat Room</h1>
+
+    <div class="controls">
+        <button id="shareScreen">Share Screen</button>
+    </div>
+
+    <div class="stream-section">
+        <video id="remoteScreen" autoplay playsinline></video>
+        <audio id="remoteAudio" controls autoplay></audio>
+    </div>
+
+    <div class="status" id="status">Waiting for connection...</div>
+
+    <div class="chat">
+        <div class="messages" id="chatMessages"></div>
+        <input type="text" id="chatInput" placeholder="Type a message" />
+        <button id="sendChat">Send</button>
+    </div>
+
+    <div class="user-list">
+        <h3>Active Users</h3>
+    </div>
+</div>
+
+<script>
+    const ws = new WebSocket('ws://localhost:8000');
+    let peer = null;
+    let currentRoom = null;
+
+    // Элементы страницы
+    const remoteAudio = document.getElementById('remoteAudio');
+    const remoteScreen = document.getElementById('remoteScreen');
+    const status = document.getElementById('status');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const newRoomInput = document.getElementById('newRoomInput');
+    const userListContainer = document.querySelector('.user-list');
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+
+    // WebSocket connection established
+    ws.onopen = () => {
+        status.textContent = 'Connected to WebSocket server';
+    };
+
+    // Handle incoming WebSocket messages
+    ws.onmessage = (message) => {
+        const data = JSON.parse(message.data);
+
+        if (data.type === 'roomList') {
+            // Обновляем список комнат на клиенте
+            updateRoomList(data.rooms);
+        }
+
+        if (data.sdp) {
+            peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            if (data.sdp.type === 'offer') {
+                peer.createAnswer().then(answer => {
+                    peer.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ sdp: answer }));
+                });
+            }
+        } else if (data.candidate) {
+            peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } else if (data.type === 'updateUserList') {
+            updateUserList(data.users);
+        } else if (data.type === 'chat') {
+            appendChatMessage(`${data.username}: ${data.message}`);
+        } else if (data.type === 'notification') {
+            appendChatMessage(data.message);
+        }
+    };
+
+    // Send chat message
+    document.getElementById('sendChat').addEventListener('click', () => {
+        const message = chatInput.value.trim();
+        if (message && currentRoom) {
+            const chatData = { type: 'chat', message };
+            ws.send(JSON.stringify(chatData));
+            chatInput.value = ''; // Clear the input field
+        }
+    });
+
+    // Append chat messages to chat window
+    function appendChatMessage(message) {
+        const messageElement = document.createElement('div');
+        messageElement.textContent = message;
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight; // Auto scroll to latest message
+    }
+
+    // Set nickname
+    document.getElementById('setNicknameButton').addEventListener('click', () => {
+        const nickname = nicknameInput.value.trim();
+        if (nickname) {
+            ws.send(JSON.stringify({ action: 'changeUsername', username: nickname }));
+        }
+    });
+
+    // Create a new room
+    document.getElementById('createRoomButton').addEventListener('click', () => {
+        const roomName = newRoomInput.value.trim();
+        if (roomName) {
+            ws.send(JSON.stringify({ action: 'createRoom', room: roomName }));
+            newRoomInput.value = ''; // Clear the input field
+        }
+    });
+
+    // Join a room
+    function joinRoom(roomName) {
+        currentRoom = roomName;
+        ws.send(JSON.stringify({ action: 'joinRoom', room: roomName }));
+        status.textContent = `Joined room: ${roomName}`;
+        startVoiceChat(); // Automatically start voice chat when joining a room
+    }
+
+    // Add room button
+    function addRoomButton(roomName) {
+        const roomList = document.querySelector('.room-list');
+        const roomButton = document.createElement('div');
+        roomButton.textContent = roomName;
+        roomButton.classList.add('room');
+        roomButton.addEventListener('click', () => joinRoom(roomName));
+        roomList.appendChild(roomButton);
+    }
+
+    // Update room list
+    function updateRoomList(rooms) {
+        const roomList = document.querySelector('.room-list');
+        roomList.innerHTML = ''; // Clear the room list
+        rooms.forEach(room => {
+            addRoomButton(room); // Add new rooms to the list
+        });
+    }
+
+    // Update active user list
+    function updateUserList(users) {
+        userListContainer.innerHTML = '<h3>Active Users</h3>'; // Clear user list
+        users.forEach(user => {
+            const userElement = document.createElement('div');
+            userElement.classList.add('user', 'active'); // Add active user class
+            userElement.textContent = user;
+            userListContainer.appendChild(userElement);
+        });
+    }
+
+    // Start WebRTC voice chat
+    function startVoiceChat() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    setupPeerConnection(stream);
+                })
+                .catch(error => {
+                    console.error('Error accessing media devices.', error);
+                });
+        } else {
+            alert('getUserMedia не поддерживается в этом браузере.');
+        }
+    }
+
+    // Setup WebRTC connection
+    function setupPeerConnection(stream) {
+        peer = new RTCPeerConnection();
+
+        stream.getTracks().forEach(track => {
+            peer.addTrack(track, stream);
+        });
+
+        peer.ontrack = (event) => {
+            const remoteStream = event.streams[0];
+            if (event.track.kind === 'audio') {
+                remoteAudio.srcObject = remoteStream;
+            } else if (event.track.kind === 'video') {
+                remoteScreen.srcObject = remoteStream;
+            }
+        };
+
+        peer.onicecandidate = (event) => {
+            if (event.candidate && currentRoom) {
+                ws.send(JSON.stringify({ candidate: event.candidate }));
+            }
+        };
+
+        peer.createOffer().then(offer => {
+            peer.setLocalDescription(offer);
+            ws.send(JSON.stringify({ sdp: offer }));
+        });
+    }
+
+    // Share screen functionality
+    document.getElementById('shareScreen').addEventListener('click', () => {
+        navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+            .then(stream => {
+                setupPeerConnection(stream);
+            })
+            .catch(error => {
+                console.error('Error accessing display media.', error);
+            });
+    });
+</script>
+</body>
+</html>
