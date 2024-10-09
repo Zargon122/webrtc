@@ -289,6 +289,11 @@
             appendChatMessage(`${data.username}: ${data.message}`);
         } else if (data.type === 'notification') {
             appendChatMessage(data.message);
+        } else if (data.type === 'chatHistory') {
+            // Обработка истории чата
+            data.messages.forEach(msg => {
+                appendChatMessage(`${msg.username}: ${msg.message}`);
+            });
         }
     };
 

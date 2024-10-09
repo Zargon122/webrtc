@@ -11,9 +11,10 @@ const wss = new WebSocket.Server({ server });
 // Инициализация базы данных SQLite
 const db = new sqlite3.Database(':memory:'); // Вы можете использовать файл для постоянного хранения
 
-// Создание таблицы комнат в базе данных
+// Создание таблицы комнат и сообщений в базе данных
 db.serialize(() => {
     db.run("CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)");
+    db.run("CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, roomName TEXT, username TEXT, message TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)");
 });
 
 // Функция для добавления комнаты в базу данных
@@ -38,14 +39,34 @@ function getAllRooms(callback) {
     });
 }
 
+// Сохранение сообщения в базе данных
+function saveMessage(roomName, username, message) {
+    db.run("INSERT INTO messages (roomName, username, message) VALUES (?, ?, ?)", [roomName, username, message], (err) => {
+        if (err) {
+            console.log(`Error saving message: ${err.message}`);
+        }
+    });
+}
+
+// Получение истории сообщений для комнаты
+function getChatHistory(roomName, callback) {
+    db.all("SELECT username, message, timestamp FROM messages WHERE roomName = ? ORDER BY timestamp ASC", [roomName], (err, rows) => {
+        if (err) {
+            console.log(`Error retrieving messages: ${err.message}`);
+            return;
+        }
+        callback(rows);
+    });
+}
+
 // Комнаты: ключ - название комнаты, значение - список WebSocket подключений
 const rooms = {};
 
-// Отправка сообщения всем пользователям в комнате, кроме отправителя
-function broadcastToRoom(roomName, message, sender) {
+// Отправка сообщения всем пользователям в комнате
+function broadcastToRoom(roomName, message, sender = null) {
     if (rooms[roomName]) {
         rooms[roomName].forEach(client => {
-            if (client !== sender && client.readyState === WebSocket.OPEN) {
+            if (client.readyState === WebSocket.OPEN) {
                 client.send(message);
             }
         });
@@ -91,11 +112,8 @@ wss.on('connection', (ws) => {
             const roomName = data.room;
             if (!rooms[roomName]) {
                 rooms[roomName] = [];
-                // Добавляем комнату в базу данных
                 addRoomToDatabase(roomName, () => {
-                    // После добавления комнаты в базу данных отправляем уведомление пользователю
                     ws.send(JSON.stringify({ type: 'notification', message: `Room '${roomName}' created.` }));
-                    // Обновляем список комнат для всех пользователей
                     getAllRooms((roomList) => {
                         wss.clients.forEach(client => {
                             client.send(JSON.stringify({ type: 'roomList', rooms: roomList }));
@@ -122,20 +140,17 @@ wss.on('connection', (ws) => {
             }
             rooms[roomName].push(ws);
 
-            // Уведомляем всех в комнате о новом пользователе
+            // Отправляем пользователю историю сообщений
+            getChatHistory(roomName, (messages) => {
+                ws.send(JSON.stringify({ type: 'chatHistory', messages }));
+            });
+
             broadcastToRoom(roomName, JSON.stringify({
                 type: 'notification',
                 message: `${ws.username} joined the room`
             }), ws);
 
             updateUserList(roomName);
-        }
-
-        // Обработка сообщений WebRTC (SDP и ICE кандидаты)
-        if (data.sdp || data.candidate) {
-            if (ws.room && rooms[ws.room]) {
-                broadcastToRoom(ws.room, message, ws);
-            }
         }
 
         // Обработка текстового чата
@@ -145,7 +160,12 @@ wss.on('connection', (ws) => {
                 username: ws.username,
                 message: data.message
             };
-            broadcastToRoom(ws.room, JSON.stringify(chatMessage), ws);
+
+            // Сохраняем сообщение в базе данных
+            saveMessage(ws.room, ws.username, data.message);
+
+            // Отправляем сообщение всем пользователям, включая отправителя
+            broadcastToRoom(ws.room, JSON.stringify(chatMessage));
         }
     });
 
