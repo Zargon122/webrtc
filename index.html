@@ -258,7 +258,7 @@
     const userListContainer = document.querySelector('.user-list');
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
-    let localStream = null; // Локальный аудио- и видеопоток
+    let localStream = null; // Локальный поток (аудио/видео)
     let screenStream = null; // Поток для демонстрации экрана
 
     // WebSocket connection established
@@ -375,10 +375,10 @@
     // Start WebRTC voice chat
     function startVoiceChat() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ audio: true })
+            navigator.mediaDevices.getUserMedia({ audio: true, video: true })
                 .then(stream => {
                     localStream = stream;
-                    setupPeerConnection(localStream); // Настраиваем соединение с локальным потоком
+                    setupPeerConnection(localStream); // Настраиваем соединение с локальным потоком (аудио и видео)
                 })
                 .catch(error => {
                     console.error('Error accessing media devices.', error);
@@ -392,16 +392,18 @@
     function setupPeerConnection(stream) {
         peer = new RTCPeerConnection();
 
+        // Добавляем все треки (аудио и видео) в WebRTC соединение
         stream.getTracks().forEach(track => {
-            peer.addTrack(track, stream); // Добавляем все треки (аудио/видео) в соединение
+            peer.addTrack(track, stream);
         });
 
+        // При получении трека на стороне клиента (удаленный поток)
         peer.ontrack = (event) => {
             const remoteStream = event.streams[0];
             if (event.track.kind === 'audio') {
-                remoteAudio.srcObject = remoteStream; // Устанавливаем аудиопоток
+                remoteAudio.srcObject = remoteStream; // Устанавливаем аудиопоток для вывода звука
             } else if (event.track.kind === 'video') {
-                remoteScreen.srcObject = remoteStream; // Устанавливаем видеопоток
+                remoteScreen.srcObject = remoteStream; // Устанавливаем видеопоток для отображения экрана
             }
         };
 
@@ -422,16 +424,18 @@
         navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
             .then(stream => {
                 screenStream = stream;
+
+                // Добавляем видеотреки для демонстрации экрана в соединение WebRTC
                 screenStream.getTracks().forEach(track => {
-                    peer.addTrack(track, screenStream); // Добавляем треки для экрана
+                    peer.addTrack(track, screenStream);
                 });
-                setupPeerConnection(screenStream); // Настраиваем соединение с экраном
             })
             .catch(error => {
                 console.error('Error accessing display media.', error);
             });
     });
 </script>
+
 
 </body>
 </html>
