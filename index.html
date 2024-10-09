@@ -258,6 +258,8 @@
     const userListContainer = document.querySelector('.user-list');
     const chatMessages = document.getElementById('chatMessages');
     const chatInput = document.getElementById('chatInput');
+    let localStream = null; // Локальный аудио- и видеопоток
+    let screenStream = null; // Поток для демонстрации экрана
 
     // WebSocket connection established
     ws.onopen = () => {
@@ -375,7 +377,8 @@
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ audio: true })
                 .then(stream => {
-                    setupPeerConnection(stream);
+                    localStream = stream;
+                    setupPeerConnection(localStream); // Настраиваем соединение с локальным потоком
                 })
                 .catch(error => {
                     console.error('Error accessing media devices.', error);
@@ -390,15 +393,15 @@
         peer = new RTCPeerConnection();
 
         stream.getTracks().forEach(track => {
-            peer.addTrack(track, stream);
+            peer.addTrack(track, stream); // Добавляем все треки (аудио/видео) в соединение
         });
 
         peer.ontrack = (event) => {
             const remoteStream = event.streams[0];
             if (event.track.kind === 'audio') {
-                remoteAudio.srcObject = remoteStream;
+                remoteAudio.srcObject = remoteStream; // Устанавливаем аудиопоток
             } else if (event.track.kind === 'video') {
-                remoteScreen.srcObject = remoteStream;
+                remoteScreen.srcObject = remoteStream; // Устанавливаем видеопоток
             }
         };
 
@@ -418,12 +421,17 @@
     document.getElementById('shareScreen').addEventListener('click', () => {
         navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
             .then(stream => {
-                setupPeerConnection(stream);
+                screenStream = stream;
+                screenStream.getTracks().forEach(track => {
+                    peer.addTrack(track, screenStream); // Добавляем треки для экрана
+                });
+                setupPeerConnection(screenStream); // Настраиваем соединение с экраном
             })
             .catch(error => {
                 console.error('Error accessing display media.', error);
             });
     });
 </script>
+
 </body>
 </html>
